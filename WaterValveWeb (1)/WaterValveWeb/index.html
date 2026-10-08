@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#e9f1f4">
+<title>Water Valve</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #e9f1f4;
+    --ink: #12303b;
+    --muted: #5b7580;
+    --pipe: #c3d3da;
+    --water: #1f9bb0;
+    --ok: #0f7f6f;
+    --leak: #c8372d;
+    --warn: #b9770e;
+    --idle: #6d8089;
+    --surface: #f8fbfc;
+    --line: #cfdde3;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    font-family: "Figtree", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    min-height: 100vh;
+    padding: 20px 18px 36px;
+    -webkit-tap-highlight-color: transparent;
+  }
+  main { max-width: 460px; margin: 0 auto; }
+  h1 { font-size: 1.15rem; font-weight: 800; margin: 0 0 2px; letter-spacing: .01em; }
+  .conn { color: var(--muted); font-size: .9rem; margin: 0 0 18px; min-height: 1.3em; }
+
+  /* ---- headline status ---- */
+  .headline { font-size: 2.1rem; font-weight: 800; line-height: 1.1; margin: 0; }
+  .sub { color: var(--muted); margin: 6px 0 0; min-height: 1.4em; }
+  body[data-state="normal"] .headline { color: var(--ok); }
+  body[data-state="leak"]   .headline { color: var(--leak); }
+  body[data-state="learn"]  .headline { color: var(--warn); }
+  body[data-state="off"]    .headline { color: var(--idle); }
+
+  /* ---- pipe diagram: the one memorable element ---- */
+  .pipe-wrap { margin: 22px 0 8px; }
+  svg { width: 100%; height: auto; display: block; }
+  .pipe-body { fill: var(--pipe); }
+  .flow { stroke: var(--water); stroke-width: 6; stroke-linecap: round;
+          stroke-dasharray: 2 16; opacity: 0; }
+  .flow.up   { opacity: 0; }
+  body[data-conn="1"] .flow.up { opacity: 1; animation: run 1.1s linear infinite; }
+  body[data-valve="OPEN"][data-conn="1"] .flow.down { opacity: 1; animation: run 1.1s linear infinite; }
+  @keyframes run { to { stroke-dashoffset: -18; } }
+  .gate { fill: var(--leak); opacity: 0; transition: opacity .25s; }
+  body[data-valve="CLOSED"] .gate { opacity: 1; }
+  .handle { transform-origin: 160px 40px; transition: transform .35s ease; stroke: var(--ink);
+            stroke-width: 7; stroke-linecap: round; }
+  body[data-valve="OPEN"]   .handle { transform: rotate(0deg); }
+  body[data-valve="CLOSED"] .handle { transform: rotate(90deg); }
+  .valve-body { fill: var(--ink); }
+  .valve-cap  { fill: var(--surface); stroke: var(--ink); stroke-width: 3; }
+  .pipe-caption { display: flex; justify-content: space-between; color: var(--muted);
+                  font-size: .85rem; margin-top: 4px; }
+  .valve-state { font-weight: 800; color: var(--ink); }
+
+  /* ---- readings ---- */
+  dl { margin: 22px 0 6px; display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid var(--line); }
+  dl div { padding: 12px 0; border-bottom: 1px solid var(--line); }
+  dl div:nth-child(odd) { padding-right: 12px; border-right: 1px solid var(--line); }
+  dl div:nth-child(even) { padding-left: 16px; }
+  dt { color: var(--muted); font-size: .85rem; }
+  dd { margin: 2px 0 0; font-size: 1.35rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+  dd small { font-size: .8rem; font-weight: 400; color: var(--muted); }
+
+  /* ---- controls ---- */
+  .controls { display: grid; gap: 10px; margin-top: 20px; }
+  button {
+    font: inherit; font-weight: 800; font-size: 1.05rem; border: 0; border-radius: 10px;
+    padding: 16px 18px; color: #fff; cursor: pointer; min-height: 56px;
+  }
+  button:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+  .btn-open  { background: var(--ok); min-height: 72px; font-size: 1.25rem; }
+  .btn-close { background: var(--leak); min-height: 72px; font-size: 1.25rem; }
+  .btn-conn  { background: var(--ink); }
+  .btn-soft  { background: transparent; color: var(--ink); border: 1.5px solid var(--ink); font-weight: 600; }
+
+  details { margin-top: 22px; color: var(--muted); }
+  summary { cursor: pointer; font-size: .9rem; }
+  pre { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 10px;
+        max-height: 180px; overflow: auto; font-size: .78rem; color: var(--ink); white-space: pre-wrap; }
+  .unsupported { background: #fdeceb; border: 1px solid var(--leak); color: #7a1f19;
+                 padding: 12px; border-radius: 8px; margin-bottom: 14px; display: none; }
+  @media (prefers-reduced-motion: reduce) {
+    .flow { animation: none !important; }
+    .handle { transition: none; }
+  }
+</style>
+</head>
+<body data-state="off" data-valve="UNKNOWN" data-conn="0">
+<main>
+  <h1>Water Valve</h1>
+  <p class="conn" id="conn">Not connected</p>
+
+  <div class="unsupported" id="unsupported">
+    This browser can't use Bluetooth. Open this page in Chrome (Android, Windows, Mac or Linux).
+    iPhone browsers don't support it.
+  </div>
+
+  <p class="headline" id="headline">Not connected</p>
+  <p class="sub" id="sub">Tap Connect to find your valve.</p>
+
+  <div class="pipe-wrap">
+    <svg viewBox="0 0 320 100" role="img" aria-label="Pipe with a valve. Water flows when the valve is open.">
+      <rect class="pipe-body" x="0" y="35" width="320" height="30" rx="4"/>
+      <line class="flow up"   x1="8"   y1="50" x2="140" y2="50"/>
+      <line class="flow down" x1="180" y1="50" x2="312" y2="50"/>
+      <rect class="gate" x="156" y="35" width="8" height="30"/>
+      <rect class="valve-body" x="140" y="28" width="40" height="44" rx="6"/>
+      <circle class="valve-cap" cx="160" cy="40" r="8"/>
+      <g class="handle-group">
+        <line class="handle" x1="160" y1="40" x2="214" y2="40"/>
+      </g>
+    </svg>
+    <div class="pipe-caption"><span>Supply</span><span class="valve-state" id="valveState">Valve unknown</span><span>Taps</span></div>
+  </div>
+
+  <dl>
+    <div><dt>Flow</dt><dd id="flow">–<small> L/min</small></dd></div>
+    <div><dt>Pressure</dt><dd id="press">–<small> kPa</small></dd></div>
+    <div><dt>Temperature</dt><dd id="temp">–<small> °C</small></dd></div>
+    <div><dt>Humidity</dt><dd id="hum">–<small> %</small></dd></div>
+  </dl>
+
+  <div class="controls">
+    <button class="btn-conn" id="btnConn">Connect to valve</button>
+    <button class="btn-open"  id="btnOpen"  disabled>Open valve</button>
+    <button class="btn-close" id="btnClose" disabled>Close valve</button>
+    <button class="btn-soft"  id="btnStatus" disabled>Refresh status</button>
+    <button class="btn-soft"  id="btnAlerts">Turn on leak alerts</button>
+  </div>
+
+  <details>
+    <summary>Messages from the board</summary>
+    <pre id="log"></pre>
+  </details>
+</main>
+
+<script>
+(function () {
+  var SERVICE = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
+  var RX_UUID = "6e400002-b5a3-f393-e0a9-e50e24dcca9e";  // phone -> board
+  var TX_UUID = "6e400003-b5a3-f393-e0a9-e50e24dcca9e";  // board -> phone
+  var DEVICE_NAME = "WaterValve";
+
+  var device = null, rxChar = null, buf = "";
+  var enc = new TextEncoder(), dec = new TextDecoder();
+  var $ = function (id) { return document.getElementById(id); };
+  var body = document.body;
+
+  if (!navigator.bluetooth) { $("unsupported").style.display = "block"; $("btnConn").disabled = true; }
+
+  function log(t) {
+    var el = $("log");
+    el.textContent += t + "\n";
+    if (el.textContent.length > 5000) el.textContent = el.textContent.slice(-2500);
+    el.scrollTop = el.scrollHeight;
+  }
+
+  function setConn(connected, msg) {
+    body.dataset.conn = connected ? "1" : "0";
+    $("conn").textContent = msg;
+    $("btnConn").textContent = connected ? "Disconnect" : "Connect to valve";
+    $("btnOpen").disabled = !connected;
+    $("btnClose").disabled = !connected;
+    $("btnStatus").disabled = !connected;
+    if (!connected) {
+      setPanel("off", "Not connected", "Tap Connect to find your valve.");
+      setValve("UNKNOWN");
+    }
+  }
+
+  function setPanel(state, head, sub) {
+    body.dataset.state = state;
+    $("headline").textContent = head;
+    $("sub").textContent = sub;
+  }
+
+  function setValve(v) {
+    body.dataset.valve = v;
+    $("valveState").textContent = v === "OPEN" ? "Valve open" : v === "CLOSED" ? "Valve closed" : "Valve unknown";
+  }
+
+  function num(re, line) { var m = line.match(re); return m ? m[1] : null; }
+  function put(id, v) { var el = $(id); el.firstChild.nodeValue = v === null ? "–" : v; }
+
+  // ---------- leak alerts (notification + sound + vibration) ----------
+  var leakNotified = false;   // already alerted for the current leak
+  var manualClosed = false;   // you pressed "Close valve" yourself
+  var audioCtx = null;
+
+  function prepAudio() {
+    try {
+      audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === "suspended") audioCtx.resume();
+    } catch (e) {}
+  }
+
+  function beep() {
+    if (!audioCtx) return;
+    try {
+      [0, 0.35, 0.7].forEach(function (t) {
+        var o = audioCtx.createOscillator(), g = audioCtx.createGain();
+        o.frequency.value = 880; g.gain.value = 0.25;
+        o.connect(g); g.connect(audioCtx.destination);
+        o.start(audioCtx.currentTime + t); o.stop(audioCtx.currentTime + t + 0.2);
+      });
+    } catch (e) {}
+  }
+
+  function updateAlertBtn() {
+    var b = $("btnAlerts");
+    if (!("Notification" in window)) { b.textContent = "Alerts not supported in this browser"; b.disabled = true; return; }
+    var p = Notification.permission;
+    b.textContent = p === "granted" ? "Leak alerts are on (tap to test)"
+                  : p === "denied"  ? "Alerts blocked: allow notifications in browser settings"
+                  : "Turn on leak alerts";
+  }
+
+  async function showAlert(title, text) {
+    beep();
+    if (navigator.vibrate) navigator.vibrate([300, 150, 300, 150, 300]);
+    if (!("Notification" in window) || Notification.permission !== "granted") return;
+    var opts = {
+      body: text, icon: "icon-192.png", badge: "icon-192.png",
+      tag: "water-leak", renotify: true, requireInteraction: true,
+      vibrate: [300, 150, 300, 150, 300]
+    };
+    try {
+      var reg = await navigator.serviceWorker.getRegistration();
+      if (reg) { await reg.showNotification(title, opts); return; }
+    } catch (e) {}
+    try { new Notification(title, opts); } catch (e) {}
+  }
+
+  async function onAlertsClick() {
+    prepAudio();
+    if (!("Notification" in window)) return;
+    if (Notification.permission === "default") await Notification.requestPermission();
+    updateAlertBtn();
+    if (Notification.permission === "granted") {
+      showAlert("Test alert", "Leak alerts are working on this device.");
+    }
+  }
+
+  function leakHappened() {
+    document.title = "LEAK! - Water Valve";
+    setPanel("leak", "Leak detected", "The valve is closed. Fix the leak, then open the valve.");
+    setValve("CLOSED");
+    if (!leakNotified) {
+      leakNotified = true;
+      showAlert("Water leak detected", "The valve has been closed. Open the app to reopen it after fixing the leak.");
+    }
+  }
+
+  function leakCleared() {
+    leakNotified = false;
+    document.title = "Water Valve";
+  }
+
+  function handleLine(line) {
+    log(line);
+    var up = line.toUpperCase();
+
+    if (up.indexOf("LEAK DETECTED") >= 0) { manualClosed = false; leakHappened(); return; }
+    if (up === "VALVE OPENED") { manualClosed = false; leakCleared(); setValve("OPEN"); return; }
+    if (up === "VALVE CLOSED") { setValve("CLOSED"); return; }
+
+    var parts = line.split(" | ");
+    if (parts.length >= 3 && /^VALVE /i.test(parts[1])) {
+      var st = parts[0].toUpperCase();
+      setValve(/CLOSED/i.test(parts[1]) ? "CLOSED" : "OPEN");
+      if (st === "LEAK") {
+        if (manualClosed) setPanel("learn", "Valve closed", "You closed it from the app.");
+        else leakHappened();
+      } else if (st === "NORMAL") {
+        manualClosed = false; leakCleared();
+        setPanel("normal", "No leak", "Everything looks normal.");
+      } else {
+        setPanel("learn", "Calibrating", parts[0].toLowerCase());
+      }
+      put("flow", num(/Flow ([\d.]+)/, line));
+      put("press", num(/Press ([\d.]+)/, line));
+      put("temp", num(/\| ([\d.]+)C /, line));
+      put("hum", num(/C ([\d.]+)%/, line));
+    }
+  }
+
+  function onNotify(ev) {
+    buf += dec.decode(ev.target.value);
+    var i;
+    while ((i = buf.indexOf("\n")) >= 0) {
+      var line = buf.slice(0, i).trim();
+      buf = buf.slice(i + 1);
+      if (line) handleLine(line);
+    }
+  }
+
+  async function connect() {
+    try {
+      setConn(false, "Choose WaterValve in the list...");
+      device = await navigator.bluetooth.requestDevice({
+        filters: [{ name: DEVICE_NAME }],
+        optionalServices: [SERVICE]
+      });
+      device.addEventListener("gattserverdisconnected", function () {
+        rxChar = null;
+        setConn(false, "Disconnected. Tap Connect to reconnect.");
+      });
+      $("conn").textContent = "Connecting...";
+      var server = await device.gatt.connect();
+      var svc = await server.getPrimaryService(SERVICE);
+      rxChar = await svc.getCharacteristic(RX_UUID);
+      var tx = await svc.getCharacteristic(TX_UUID);
+      await tx.startNotifications();
+      tx.addEventListener("characteristicvaluechanged", onNotify);
+      setConn(true, "Connected to " + (device.name || DEVICE_NAME));
+      setPanel("learn", "Waiting for status", "The board sends an update every 10 seconds.");
+      send("S");
+    } catch (e) {
+      setConn(false, e && e.name === "NotFoundError" ? "No device chosen." : "Could not connect: " + e.message);
+    }
+  }
+
+  function disconnect() {
+    if (device && device.gatt.connected) device.gatt.disconnect();
+  }
+
+  async function send(cmd) {
+    if (!rxChar) return;
+    try {
+      var data = enc.encode(cmd);
+      if (rxChar.writeValueWithResponse) await rxChar.writeValueWithResponse(data);
+      else await rxChar.writeValue(data);
+    } catch (e) {
+      $("conn").textContent = "Send failed: " + e.message;
+    }
+  }
+
+  $("btnConn").addEventListener("click", function () {
+    prepAudio();
+    if (device && device.gatt.connected) disconnect(); else connect();
+  });
+  $("btnOpen").addEventListener("click", function () { manualClosed = false; send("O"); });
+  $("btnClose").addEventListener("click", function () { manualClosed = true; send("C"); });
+  $("btnAlerts").addEventListener("click", onAlertsClick);
+  updateAlertBtn();
+  $("btnStatus").addEventListener("click", function () { send("S"); });
+})();
+
+if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost" || location.hostname === "127.0.0.1")) {
+  window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); });
+}
+</script>
+</body>
+</html>
